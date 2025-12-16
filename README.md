@@ -41,7 +41,7 @@ These permissions will be automatically requested on first launch. You can manag
 On first launch, Minion will:
 1. Request necessary permissions
 2. Download the required ML model (~200MB)
-3. Create configuration file in `~/.local/minion/`
+3. Create configuration file in `~/.config/minion/`
 
 ## Updating
 

@@ -52,7 +52,6 @@ Issues should be reported in the main [Minion repository](https://github.com/div
 
 The cask currently supports:
 - Apple Silicon (ARM64)
-- Intel (x86_64)
 
 Homebrew automatically selects the appropriate binary for the current architecture.
 
