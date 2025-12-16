@@ -1,12 +1,12 @@
 cask "minion" do
-  version "TEMPLATE_VERSION"
-  sha256 "TEMPLATE_SHA256"
+  version "0.1.2"
+  sha256 "601851a1cdeeb9826bd601debe9cbaa38ea51f21344eb03ce011caee3b168fec"
 
   desc "Speech-to-text utility with global keyboard shortcuts for macOS"
   homepage "https://github.com/divmain/minion"
   
   # URL will be dynamically updated by automation
-  url "https://github.com/divmain/minion/releases/download/v#{version}/minion-#{version}-aarch64-apple-darwin.tar.gz"
+  url "https://github.com/divmain/homebrew-minion/releases/download/v0.1.2/minion-aarch64-apple-darwin.tar.gz"
     
   depends_on macos: ">= :monterey"
   depends_on arch: [:arm64, :x86_64]
