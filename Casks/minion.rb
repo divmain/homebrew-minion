@@ -17,7 +17,7 @@ cask "minion" do
   uninstall delete: "#{HOMEBREW_PREFIX}/bin/minion"
 
   caveats <<~EOS
-    #{tokens} requires macOS permissions for:
+    Minion requires macOS permissions for:
     - Accessibility (for global keyboard shortcuts)
     - Screen Recording (for audio capture)
     
