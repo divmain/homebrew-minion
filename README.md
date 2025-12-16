@@ -6,7 +6,7 @@ Homebrew tap for [Minion](https://github.com/divmain/minion) - a speech-to-text 
 
 ```bash
 # Add the tap
-brew tap divmain/homebrew-minion
+brew tap divmain/minion
 
 # Install Minion
 brew install minion
