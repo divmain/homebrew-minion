@@ -4,31 +4,98 @@ on:
   repository_dispatch:
     types: [update_needed]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.1.2)'
+        required: true
 
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout tap repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.0'
-          
-      - name: Install dependencies
+
+      - name: Get version
+        id: version
         run: |
-          gem install octokit
-          gem install json          
-      
-      - name: Update cask with latest release
-        run: ruby scripts/update_cask.rb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.client_payload.version }}"
+          fi
+          # Remove 'v' prefix if present for version number
+          VERSION_NUM="${VERSION#v}"
+          # Ensure tag has 'v' prefix
+          VERSION_TAG="v${VERSION_NUM}"
+          echo "version=${VERSION_NUM}" >> $GITHUB_OUTPUT
+          echo "tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
+          echo "Processing version: ${VERSION_NUM} (tag: ${VERSION_TAG})"
+
+      - name: Download asset from private repo
+        run: |
+          echo "Downloading minion-aarch64-apple-darwin.tar.gz from divmain/minion release ${{ steps.version.outputs.tag }}"
+          curl -L \
+            -H "Authorization: token ${{ secrets.PERSONAL_ACCESS_TOKEN }}" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/divmain/minion/releases/tags/${{ steps.version.outputs.tag }}/assets" \
+            -o /dev/null
           
+          # Get the asset download URL
+          ASSET_URL=$(curl -s \
+            -H "Authorization: token ${{ secrets.PERSONAL_ACCESS_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/divmain/minion/releases/tags/${{ steps.version.outputs.tag }}" \
+            | jq -r '.assets[] | select(.name | contains("aarch64")) | .url')
+          
+          echo "Asset URL: $ASSET_URL"
+          
+          # Download the actual asset
+          curl -L \
+            -H "Authorization: token ${{ secrets.PERSONAL_ACCESS_TOKEN }}" \
+            -H "Accept: application/octet-stream" \
+            "$ASSET_URL" \
+            -o minion-aarch64-apple-darwin.tar.gz
+          
+          ls -la minion-aarch64-apple-darwin.tar.gz
+
+      - name: Calculate SHA256
+        id: sha256
+        run: |
+          SHA256=$(shasum -a 256 minion-aarch64-apple-darwin.tar.gz | cut -d ' ' -f 1)
+          echo "sha256=${SHA256}" >> $GITHUB_OUTPUT
+          echo "SHA256: ${SHA256}"
+
+      - name: Create or update release in homebrew-minion
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          files: minion-aarch64-apple-darwin.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update cask file
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256="${{ steps.sha256.outputs.sha256 }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          
+          # Update version
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" Casks/minion.rb
+          
+          # Update sha256
+          sed -i "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Casks/minion.rb
+          
+          # Update URL to point to homebrew-minion releases
+          sed -i "s|url \".*\"|url \"https://github.com/divmain/homebrew-minion/releases/download/${TAG}/minion-aarch64-apple-darwin.tar.gz\"|" Casks/minion.rb
+          
+          echo "Updated Casks/minion.rb:"
+          cat Casks/minion.rb
+
       - name: Check for changes
         id: verify-changed-files
         run: |
@@ -37,12 +104,12 @@ jobs:
           else
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
-          
+
       - name: Commit and push changes
         if: steps.verify-changed-files.outputs.changed == 'true'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add .
-          git commit -m "Update minion to v$(ruby -ryaml -e 'puts YAML.load_file("Casks/minion.rb")["version"]')"
+          git commit -m "Update minion to ${{ steps.version.outputs.tag }}"
           git push
